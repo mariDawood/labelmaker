@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Ensure app preview surfaces that must be white remain white in dark mode */
+.bg-always-white { background-color: #ffffff !important; }
+
+/* Print utilities */
+@media print {
+  .print\:hidden { display: none !important; }
+  .print\:not-sr-only { position: static !important; width: auto !important; height: auto !important; padding: 0 !important; margin: 0 !important; clip: auto !important; clip-path: none !important; white-space: normal !important; border: 0 !important; }
+  html, body { background: #ffffff !important; }
+  
+  /* Override browser print defaults completely */
+  * {
+    box-sizing: border-box !important;
+  }
+  
+  /* Ensure PNG images print with exact dimensions and high quality */
+  .page-print img, .page-print svg {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    image-rendering: -webkit-optimize-contrast !important;
+    image-rendering: crisp-edges !important;
+    page-break-inside: avoid !important;
+  }
+  
+  /* Remove any margins/padding that could affect exact sizing */
+  .page-print {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  
+  .page-print * {
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Ensure grid layout is respected */
+  .print-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 6cm) !important;
+    gap: 0.3cm !important;
+    justify-content: start !important;
+    align-content: start !important;
+  }
+  
+  /* Allow all visual elements to render in print */
+  .print-label {
+    background: white !important;
+  }
+  
+  /* Preserve everything inside labels for proper rendering */
+  .print-label * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Force ALL logo elements to be visible in print */
+  .print-label [data-label-container] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+  }
+  
+  /* Ensure both logo containers are visible */
+  .print-label [data-label-container] > div {
+    display: block !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 85% !important;
+    height: 85% !important;
+  }
+  
+  /* Main logo with correct color */
+  .print-label [data-label-container] > div:nth-child(2) {
+    z-index: 10 !important;
+    -webkit-mask-image: url('/label.svg') !important;
+    mask-image: url('/label.svg') !important;
+    -webkit-mask-size: contain !important;
+    mask-size: contain !important;
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important;
+    mask-position: center !important;
+    background-color: inherit !important;
+  }
+  
+  /* Glow effect behind logo */
+  .print-label [data-label-container] > div:first-child {
+    z-index: 5 !important;
+    -webkit-mask-image: url('/label.svg') !important;
+    mask-image: url('/label.svg') !important;
+    -webkit-mask-size: contain !important;
+    mask-size: contain !important;
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important;
+    mask-position: center !important;
+    background-color: white !important;
+    filter: blur(8px) !important;
+    opacity: 0.6 !important;
+  }
+  
+  /* Fallback: If masks don't work, use background images */
+  @supports not (-webkit-mask-image: url('/label.svg')) {
+    .print-label [data-label-container] > div:nth-child(2) {
+      background-image: url('/label.svg') !important;
+      background-size: contain !important;
+      background-repeat: no-repeat !important;
+      background-position: center !important;
+      -webkit-mask: none !important;
+      mask: none !important;
+    }
+    .print-label [data-label-container] > div:first-child {
+      background-image: url('/label.svg') !important;
+      background-size: contain !important;
+      background-repeat: no-repeat !important;
+      background-position: center !important;
+      -webkit-mask: none !important;
+      mask: none !important;
+    }
+  }
+}
