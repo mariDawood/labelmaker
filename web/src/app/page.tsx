@@ -1,22 +1,67 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LabelPreview, { BackgroundPattern } from "@/components/LabelPreview";
 import { PrinterIcon } from "lucide-react";
 import { ArrowRightIcon } from "lucide-react";
 import { ChevronDownIcon } from "lucide-react";
+import { saveDesignState, loadDesignState, defaultDesignState, DesignState, setupHardRefreshDetection } from "@/utils/designState";
 
 export default function Home() {
   const router = useRouter();
-  const [logoColor, setLogoColor] = useState<string>("#8B5CF6");
-  const [pattern, setPattern] = useState<BackgroundPattern>("dots");
-  const [patternColor, setPatternColor] = useState<string>("#5B21B6");
-  const [text, setText] = useState<string>("Appelmoes");
-  const [textPosition, setTextPosition] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
-  const [textSize, setTextSize] = useState<{ width: number; height: number; fontSize: number }>({ width: 200, height: 80, fontSize: 24 });
+  const [logoColor, setLogoColor] = useState<string>(defaultDesignState.logoColor);
+  const [pattern, setPattern] = useState<BackgroundPattern>(defaultDesignState.pattern);
+  const [patternColor, setPatternColor] = useState<string>(defaultDesignState.patternColor);
+  const [textColor, setTextColor] = useState<string>(defaultDesignState.textColor);
+  const [text, setText] = useState<string>(defaultDesignState.text);
+  const [textPosition, setTextPosition] = useState<{ x: number; y: number }>(defaultDesignState.textPosition);
+  const [textSize, setTextSize] = useState<{ width: number; height: number; fontSize: number }>(defaultDesignState.textSize);
   const [isColorThemesOpen, setIsColorThemesOpen] = useState<boolean>(false);
+
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Setup hard refresh detection and load saved design state on mount
+  useEffect(() => {
+    console.log('🚀 Home page mounted, setting up hard refresh detection...');
+    setupHardRefreshDetection();
+    
+    console.log('📖 Loading saved design state...');
+    const savedState = loadDesignState();
+    if (savedState) {
+      console.log('✅ Applying saved state:', savedState);
+      setLogoColor(savedState.logoColor);
+      setPattern(savedState.pattern);
+      setPatternColor(savedState.patternColor);
+      setTextColor(savedState.textColor);
+      setText(savedState.text);
+      setTextPosition(savedState.textPosition);
+      setTextSize(savedState.textSize);
+    } else {
+      console.log('❌ No saved state found, using defaults');
+    }
+    
+    // Mark as initialized after loading saved state
+    setIsInitialized(true);
+  }, []);
+
+  // Save design state whenever any design property changes (but only after initialization)
+  useEffect(() => {
+    if (!isInitialized) return; // Don't save during initial load
+    
+    console.log('💾 Design state changed, saving...', { text, logoColor, pattern, patternColor, textColor, textPosition, textSize });
+    const currentState: DesignState = {
+      text,
+      logoColor,
+      pattern,
+      patternColor,
+      textColor,
+      textPosition,
+      textSize
+    };
+    saveDesignState(currentState);
+  }, [text, logoColor, pattern, patternColor, textColor, textPosition, textSize, isInitialized]);
 
   const handlePrintNavigation = () => {
     // Always use parameter-based approach to avoid html2canvas color issues
@@ -26,6 +71,7 @@ export default function Home() {
       logoColor,
       pattern,
       patternColor,
+      textColor,
       textX: textPosition.x.toString(),
       textY: textPosition.y.toString(),
       textWidth: textSize.width.toString(),
@@ -81,6 +127,7 @@ export default function Home() {
             logoColor={logoColor}
             pattern={pattern}
             patternColor={patternColor}
+            textColor={textColor}
             textPosition={textPosition}
             textSize={textSize}
             onTextPositionChange={setTextPosition}
@@ -123,6 +170,7 @@ export default function Home() {
                     onClick={() => {
                       setLogoColor(theme.logo);
                       setPatternColor(theme.pattern);
+                      setTextColor(theme.pattern); // Set text color to match pattern color by default
                     }}
                     className={`p-3 rounded-lg border-2 transition-all hover:scale-105 ${
                       logoColor === theme.logo && patternColor === theme.pattern 
@@ -149,7 +197,7 @@ export default function Home() {
 
           {/* Custom Colors Section */}
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-foreground">Logo Color</label>
                 <div className="flex items-center gap-2">
@@ -172,6 +220,18 @@ export default function Home() {
                     className="w-12 h-12 rounded-lg cursor-pointer border border-foreground/20"
                   />
                   <span className="text-sm text-foreground/70">{patternColor}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">Text Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={textColor}
+                    onChange={(e) => setTextColor(e.target.value)}
+                    className="w-12 h-12 rounded-lg cursor-pointer border border-foreground/20"
+                  />
+                  <span className="text-sm text-foreground/70">{textColor}</span>
                 </div>
               </div>
             </div>
@@ -245,6 +305,7 @@ export default function Home() {
               className="w-full rounded-lg border border-foreground/20 bg-background px-4 py-3 text-base focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-colors resize-vertical"
             />
           </div>
+
         </aside>
       </div>
     </div>

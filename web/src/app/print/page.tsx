@@ -4,6 +4,7 @@ import Link from "next/link";
 import LabelPreview, { BackgroundPattern } from "@/components/LabelPreview";
 import { PrinterIcon, ArrowLeftIcon } from "lucide-react";
 import * as htmlToImage from "html-to-image";
+import { loadDesignState, defaultDesignState } from "@/utils/designState";
 
 function getStringParam(searchParams: URLSearchParams, key: string, fallback: string) {
   const v = searchParams.get(key);
@@ -28,13 +29,15 @@ export default function PrintPage() {
   const captureHostRef = useRef<HTMLDivElement | null>(null);
   const [labelPngDataUrl, setLabelPngDataUrl] = useState<string>("");
 
-  // Label design data - always from parameters to preserve exact design
-  const [text, setText] = useState("Your Text");
-  const [logoColor, setLogoColor] = useState("#8B5CF6");
-  const [pattern, setPattern] = useState<BackgroundPattern>("dots");
-  const [patternColor, setPatternColor] = useState("#5B21B6");
-  const [textPosition, setTextPosition] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
-  const [textSize, setTextSize] = useState<{ width: number; height: number; fontSize: number }>({ width: 200, height: 80, fontSize: 24 });
+  // Label design data - load from saved state first, then fallback to parameters
+  const [text, setText] = useState(defaultDesignState.text);
+  const [logoColor, setLogoColor] = useState(defaultDesignState.logoColor);
+  const [pattern, setPattern] = useState<BackgroundPattern>(defaultDesignState.pattern);
+  const [patternColor, setPatternColor] = useState(defaultDesignState.patternColor);
+  const [textColor, setTextColor] = useState(defaultDesignState.textColor);
+  const [textPosition, setTextPosition] = useState<{ x: number; y: number }>(defaultDesignState.textPosition);
+  const [textSize, setTextSize] = useState<{ width: number; height: number; fontSize: number }>(defaultDesignState.textSize);
+  const [labelDimensions, setLabelDimensions] = useState<{ width: number; height: number }>({ width: 6, height: 4 }); // cm
 
   useEffect(() => {
     setIsMounted(true);
@@ -43,21 +46,40 @@ export default function PrintPage() {
   useEffect(() => {
     if (!isMounted) return;
     
-    const sp = new URLSearchParams(window.location.search);
+    // First try to load from saved state
+    const savedState = loadDesignState();
+    if (savedState) {
+      setText(savedState.text);
+      setLogoColor(savedState.logoColor);
+      setPattern(savedState.pattern);
+      setPatternColor(savedState.patternColor);
+      setTextColor(savedState.textColor);
+      setTextPosition(savedState.textPosition);
+      setTextSize(savedState.textSize);
+    } else {
+      // Fallback to URL parameters if no saved state
+      const sp = new URLSearchParams(window.location.search);
+      setText(getStringParam(sp, "text", defaultDesignState.text));
+      setLogoColor(getStringParam(sp, "logoColor", defaultDesignState.logoColor));
+      setPattern(getPatternParam(sp, "pattern", defaultDesignState.pattern));
+      setPatternColor(getStringParam(sp, "patternColor", defaultDesignState.patternColor));
+      setTextColor(getStringParam(sp, "textColor", defaultDesignState.textColor));
+      setTextPosition({
+        x: getNumberParam(sp, "textX", defaultDesignState.textPosition.x),
+        y: getNumberParam(sp, "textY", defaultDesignState.textPosition.y)
+      });
+      setTextSize({
+        width: getNumberParam(sp, "textWidth", defaultDesignState.textSize.width),
+        height: getNumberParam(sp, "textHeight", defaultDesignState.textSize.height),
+        fontSize: getNumberParam(sp, "textFontSize", defaultDesignState.textSize.fontSize)
+      });
+    }
     
-    // Always load from parameters to preserve exact design
-    setText(getStringParam(sp, "text", "One apple\nTwo apples"));
-    setLogoColor(getStringParam(sp, "logoColor", "#8B5CF6"));
-    setPattern(getPatternParam(sp, "pattern", "dots"));
-    setPatternColor(getStringParam(sp, "patternColor", "#5B21B6"));
-    setTextPosition({
-      x: getNumberParam(sp, "textX", 50),
-      y: getNumberParam(sp, "textY", 50)
-    });
-    setTextSize({
-      width: getNumberParam(sp, "textWidth", 200),
-      height: getNumberParam(sp, "textHeight", 80),
-      fontSize: getNumberParam(sp, "textFontSize", 24)
+    // Always load label dimensions from URL parameters
+    const sp = new URLSearchParams(window.location.search);
+    setLabelDimensions({
+      width: getNumberParam(sp, "labelWidth", 6),
+      height: getNumberParam(sp, "labelHeight", 4)
     });
   }, [isMounted]);
 
@@ -86,7 +108,7 @@ export default function PrintPage() {
     if (!isMounted) return;
     generateLabelPng();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, logoColor, pattern, patternColor, textPosition.x, textPosition.y, textSize.width, textSize.height, textSize.fontSize]);
+  }, [text, logoColor, pattern, patternColor, textColor, textPosition.x, textPosition.y, textSize.width, textSize.height, textSize.fontSize, labelDimensions.width, labelDimensions.height]);
 
   // Reset to page 1 when count changes
   useEffect(() => {
@@ -98,13 +120,56 @@ export default function PrintPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target && (e.target as HTMLElement).tagName === 'INPUT') return; // Don't interfere with input fields
       
-      const a4WidthCm = 21 - 1;
-      const a4HeightCm = 29.7 - 1;
-      const labelWidthCm = 6;
-      const labelHeightCm = 4;
-      const spacingCm = 0.3;
-      const maxLabelsPerRow = Math.floor((a4WidthCm + spacingCm) / (labelWidthCm + spacingCm));
-      const maxLabelsPerCol = Math.floor((a4HeightCm + spacingCm) / (labelHeightCm + spacingCm));
+      // A4 calculations with correct margins (matching print layout)
+      const a4WidthCm = 21;
+      const a4HeightCm = 29.7;
+      const horizontalMargins = 2.1 * 2;
+      const verticalMargins = 2.97 * 2;
+      
+      const usableWidthCm = a4WidthCm - horizontalMargins; // 16.8cm
+      const usableHeightCm = a4HeightCm - verticalMargins; // 23.76cm
+      
+      const labelWidthCm = labelDimensions.width;
+      const labelHeightCm = labelDimensions.height;
+      
+      // Calculate maximum labels per row with dynamic spacing
+      const calculateMaxLabelsPerRow = (labelWidth: number) => {
+        if (labelWidth >= usableWidthCm) return 1;
+        let maxLabels = 1;
+        let minSpacing = 0.1;
+        for (let labels = 2; labels <= 10; labels++) {
+          const totalLabelWidth = labels * labelWidth;
+          const requiredSpacing = (labels - 1) * minSpacing;
+          const totalWidth = totalLabelWidth + requiredSpacing;
+          if (totalWidth <= usableWidthCm) {
+            maxLabels = labels;
+          } else {
+            break;
+          }
+        }
+        return maxLabels;
+      };
+      
+      // Calculate maximum labels per column with dynamic spacing
+      const calculateMaxLabelsPerCol = (labelHeight: number) => {
+        if (labelHeight >= usableHeightCm) return 1;
+        let maxLabels = 1;
+        let minSpacing = 0.1;
+        for (let labels = 2; labels <= 20; labels++) {
+          const totalLabelHeight = labels * labelHeight;
+          const requiredSpacing = (labels - 1) * minSpacing;
+          const totalHeight = totalLabelHeight + requiredSpacing;
+          if (totalHeight <= usableHeightCm) {
+            maxLabels = labels;
+          } else {
+            break;
+          }
+        }
+        return maxLabels;
+      };
+      
+      const maxLabelsPerRow = calculateMaxLabelsPerRow(labelWidthCm);
+      const maxLabelsPerCol = calculateMaxLabelsPerCol(labelHeightCm);
       const maxLabelsOnA4 = maxLabelsPerRow * maxLabelsPerCol;
       const totalPages = Math.ceil(count / maxLabelsOnA4);
 
@@ -127,11 +192,11 @@ export default function PrintPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [count, currentPage]);
+  }, [count, currentPage, labelDimensions]);
 
   // Calculate cm dimensions for A4 printing
-  const labelWidthCm = 6; // Standard label width in cm
-  const labelHeightCm = 4; // Standard label height in cm
+  const labelWidthCm = labelDimensions.width;
+  const labelHeightCm = labelDimensions.height;
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
@@ -174,21 +239,65 @@ export default function PrintPage() {
             <div>
                 <label className="block text-sm font-medium mb-1 text-foreground">Label size</label>
                 <div className="text-sm text-foreground/60 pt-2">
-                  {labelWidthCm} × {labelHeightCm} cm
+                  {labelWidthCm.toFixed(1)} × {labelHeightCm.toFixed(1)} cm
             </div>
+          </div>
+        </div>
+
+        {/* Label Size Controls */}
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-foreground">Label Dimensions</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Width (cm)</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                step={0.1}
+                value={labelDimensions.width}
+                onChange={(e) => {
+                  const newWidth = Math.max(1, Math.min(20, parseFloat(e.target.value) || 1));
+                  const aspectRatio = labelDimensions.height / labelDimensions.width;
+                  setLabelDimensions({ width: newWidth, height: newWidth * aspectRatio });
+                }}
+                className="w-full rounded-lg border border-foreground/20 bg-background px-3 py-2 text-base focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Height (cm)</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                step={0.1}
+                value={labelDimensions.height}
+                onChange={(e) => {
+                  const newHeight = Math.max(1, Math.min(20, parseFloat(e.target.value) || 1));
+                  const aspectRatio = labelDimensions.width / labelDimensions.height;
+                  setLabelDimensions({ width: newHeight * aspectRatio, height: newHeight });
+                }}
+                className="w-full rounded-lg border border-foreground/20 bg-background px-3 py-2 text-base focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-colors"
+              />
+            </div>
+          </div>
+          <div className="text-sm text-foreground/70 text-center">
+            Current size: {labelDimensions.width.toFixed(1)} × {labelDimensions.height.toFixed(1)} cm
           </div>
         </div>
 
             <div className="p-4 bg-foreground/5 border border-foreground/10 rounded-lg">
               <div className="border border-foreground/20 bg-white rounded p-2 inline-block">
-                <div style={{ width: '200px', height: '133px' }}>
+                <div style={{ width: '200px', height: `${200 * (labelHeightCm / labelWidthCm)}px` }}>
             <LabelPreview 
               text={text} 
               logoColor={logoColor} 
               pattern={pattern} 
               patternColor={patternColor}
+              textColor={textColor}
               textPosition={textPosition}
               textSize={textSize}
+              labelDimensions={labelDimensions}
               className="w-full h-full" 
             />
           </div>
@@ -203,16 +312,54 @@ export default function PrintPage() {
           
           <div className="border border-foreground/20 rounded-lg p-4 bg-background">
             {(() => {
-              // A4 calculations
-              const a4WidthCm = 21 - 1; // 20cm usable (0.5cm margins each side)
-              const a4HeightCm = 29.7 - 1; // 28.7cm usable (0.5cm margins top/bottom)
-              const labelWidthCm = 6;
-              const labelHeightCm = 4;
-              const spacingCm = 0.3; // 3mm spacing between labels
+              // A4 calculations with correct margins (matching print layout)
+              const a4WidthCm = 21; // Full A4 width
+              const a4HeightCm = 29.7; // Full A4 height
+              const horizontalMargins = 2.1 * 2; // 2.1cm margins on each side
+              const verticalMargins = 2.97 * 2; // 2.97cm margins top and bottom
               
-              const maxLabelsPerRow = Math.floor((a4WidthCm + spacingCm) / (labelWidthCm + spacingCm)); // 3
-              const maxLabelsPerCol = Math.floor((a4HeightCm + spacingCm) / (labelHeightCm + spacingCm)); // 6
-              const maxLabelsOnA4 = maxLabelsPerRow * maxLabelsPerCol; // 18
+              const usableWidthCm = a4WidthCm - horizontalMargins; // 16.8cm usable width
+              const usableHeightCm = a4HeightCm - verticalMargins; // 23.76cm usable height
+              
+              // Calculate maximum labels per row with dynamic spacing
+              const calculateMaxLabelsPerRow = (labelWidth: number) => {
+                if (labelWidth >= usableWidthCm) return 1;
+                let maxLabels = 1;
+                let minSpacing = 0.1; // Minimum 1mm spacing
+                for (let labels = 2; labels <= 10; labels++) {
+                  const totalLabelWidth = labels * labelWidth;
+                  const requiredSpacing = (labels - 1) * minSpacing;
+                  const totalWidth = totalLabelWidth + requiredSpacing;
+                  if (totalWidth <= usableWidthCm) {
+                    maxLabels = labels;
+                  } else {
+                    break;
+                  }
+                }
+                return maxLabels;
+              };
+              
+              // Calculate maximum labels per column with dynamic spacing
+              const calculateMaxLabelsPerCol = (labelHeight: number) => {
+                if (labelHeight >= usableHeightCm) return 1;
+                let maxLabels = 1;
+                let minSpacing = 0.1; // Minimum 1mm spacing
+                for (let labels = 2; labels <= 20; labels++) {
+                  const totalLabelHeight = labels * labelHeight;
+                  const requiredSpacing = (labels - 1) * minSpacing;
+                  const totalHeight = totalLabelHeight + requiredSpacing;
+                  if (totalHeight <= usableHeightCm) {
+                    maxLabels = labels;
+                  } else {
+                    break;
+                  }
+                }
+                return maxLabels;
+              };
+              
+              const maxLabelsPerRow = calculateMaxLabelsPerRow(labelWidthCm);
+              const maxLabelsPerCol = calculateMaxLabelsPerCol(labelHeightCm);
+              const maxLabelsOnA4 = maxLabelsPerRow * maxLabelsPerCol;
               
               const totalPages = Math.ceil(count / maxLabelsOnA4);
               
@@ -221,13 +368,19 @@ export default function PrintPage() {
               const endIndex = Math.min(startIndex + maxLabelsOnA4, count);
               const labelsOnCurrentPage = endIndex - startIndex;
               
-              const actualCols = Math.min(maxLabelsPerRow, Math.ceil(Math.sqrt(labelsOnCurrentPage)));
+              const actualCols = Math.min(maxLabelsPerRow, labelsOnCurrentPage);
               const actualRows = Math.ceil(labelsOnCurrentPage / actualCols);
               
-              const labelWidthPercent = (labelWidthCm / (a4WidthCm + 1)) * 100;
-              const labelHeightPercent = (labelHeightCm / (a4HeightCm + 1)) * 100;
-              const spacingWidthPercent = (spacingCm / (a4WidthCm + 1)) * 100;
-              const spacingHeightPercent = (spacingCm / (a4HeightCm + 1)) * 100;
+              // Calculate dynamic spacing for preview (same as print layout)
+              const horizontalSpacing = maxLabelsPerRow > 1 ? 
+                (usableWidthCm - (maxLabelsPerRow * labelWidthCm)) / (maxLabelsPerRow - 1) : 0;
+              const verticalSpacing = maxLabelsPerCol > 1 ? 
+                (usableHeightCm - (maxLabelsPerCol * labelHeightCm)) / (maxLabelsPerCol - 1) : 0;
+              
+              const labelWidthPercent = (labelWidthCm / usableWidthCm) * 100;
+              const labelHeightPercent = (labelHeightCm / usableHeightCm) * 100;
+              const spacingWidthPercent = (horizontalSpacing / usableWidthCm) * 100;
+              const spacingHeightPercent = (verticalSpacing / usableHeightCm) * 100;
               
               return (
                 <>
@@ -299,34 +452,37 @@ export default function PrintPage() {
                     <div className="w-full h-full bg-gradient-to-br from-white to-gray-50 p-2 relative">
                       {/* Show A4 margins with subtle pattern */}
                       <div className="w-full h-full p-1 relative" style={{ background: 'linear-gradient(45deg, #f8f9fa 25%, transparent 25%), linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f8f9fa 75%), linear-gradient(-45deg, transparent 75%, #f8f9fa 75%)', backgroundSize: '8px 8px', backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0px' }}>
-                        {Array.from({ length: labelsOnCurrentPage }).map((_, i) => {
-                          const row = Math.floor(i / actualCols);
-                          const col = i % actualCols;
-                          
-                          return (
+                        <div 
+                          className="grid border border-gray-300 bg-white shadow-sm"
+                          style={{
+                            gridTemplateColumns: `repeat(${actualCols}, 1fr)`,
+                            gridTemplateRows: `repeat(${actualRows}, 1fr)`,
+                            gap: `${spacingHeightPercent}% ${spacingWidthPercent}%`,
+                            width: '100%',
+                            height: '100%',
+                            padding: '2%'
+                          }}
+                        >
+                          {Array.from({ length: labelsOnCurrentPage }).map((_, i) => (
                             <div 
                               key={startIndex + i} 
-                              className="absolute border border-gray-300 bg-white shadow-sm"
-                  style={{ 
-                                left: `${2 + col * (labelWidthPercent + spacingWidthPercent)}%`,
-                                top: `${2 + row * (labelHeightPercent + spacingHeightPercent)}%`,
-                                width: `${labelWidthPercent}%`,
-                                height: `${labelHeightPercent}%`,
-                              }}
+                              className="border border-gray-200 bg-white"
                             >
                               <LabelPreview
                                 text={text}
                                 logoColor={logoColor}
                                 pattern={pattern}
                                 patternColor={patternColor}
+                                textColor={textColor}
                                 textPosition={textPosition}
                                 textSize={textSize}
+                                labelDimensions={labelDimensions}
                                 className="w-full h-full"
                                 forceScale={0.15} // Small scale for tiny preview boxes
-                />
-              </div>
-                          );
-                        })}
+                              />
+                            </div>
+                          ))}
+                        </div>
                         
                         {/* Page indicator */}
                         <div className="absolute top-2 right-2 flex items-center gap-1 text-xs text-foreground bg-background/95 backdrop-blur-sm px-2 py-1 rounded-full shadow-lg border border-foreground/20">
@@ -351,8 +507,10 @@ export default function PrintPage() {
             logoColor={logoColor} 
             pattern={pattern} 
             patternColor={patternColor}
+            textColor={textColor}
             textPosition={textPosition}
             textSize={textSize}
+            labelDimensions={labelDimensions}
             className="w-full h-full"
             forceScale={1}
           />
@@ -362,48 +520,128 @@ export default function PrintPage() {
       {/* Print Layout - This is what gets printed */}
       <div className="hidden print:block page-print">
         {(() => {
-          // Same calculations as preview to ensure identical layout
-          const a4WidthCm = 21 - 1; // 20cm usable
-          const a4HeightCm = 29.7 - 1; // 28.7cm usable  
-          const printLabelWidthCm = 6; // Must match preview exactly
-          const printLabelHeightCm = 4; // Must match preview exactly
-          const spacingCm = 0.3; // 3mm spacing
+          // A4 page dimensions with correct margins
+          const a4WidthCm = 21; // Full A4 width
+          const a4HeightCm = 29.7; // Full A4 height
+          const horizontalMargins = 2.1 * 2; // 2.1cm margins on each side
+          const verticalMargins = 2.97 * 2; // 2.97cm margins top and bottom
           
-          const maxLabelsPerRow = Math.floor((a4WidthCm + spacingCm) / (printLabelWidthCm + spacingCm));
-          const maxLabelsPerCol = Math.floor((a4HeightCm + spacingCm) / (printLabelHeightCm + spacingCm));
-          const maxPerPage = maxLabelsPerRow * maxLabelsPerCol; // 3 x 6 = 18
+          const usableWidthCm = a4WidthCm - horizontalMargins; // 16.8cm usable width
+          const usableHeightCm = a4HeightCm - verticalMargins; // 23.76cm usable height
+          
+          // Calculate maximum labels per row with dynamic spacing
+          const calculateMaxLabelsPerRow = (labelWidth: number) => {
+            if (labelWidth >= usableWidthCm) return 1; // Single label if too wide
+            
+            // Try to fit as many labels as possible with minimum spacing
+            let maxLabels = 1;
+            let minSpacing = 0.1; // Minimum 1mm spacing
+            
+            for (let labels = 2; labels <= 50; labels++) {
+              const totalLabelWidth = labels * labelWidth;
+              const requiredSpacing = (labels - 1) * minSpacing;
+              const totalWidth = totalLabelWidth + requiredSpacing;
+              
+              if (totalWidth <= usableWidthCm) {
+                maxLabels = labels;
+              } else {
+                break;
+              }
+            }
+            
+            return maxLabels;
+          };
+          
+          // Calculate maximum labels per column with dynamic spacing
+          const calculateMaxLabelsPerCol = (labelHeight: number) => {
+            if (labelHeight >= usableHeightCm) return 1; // Single label if too tall
+            
+            let maxLabels = 1;
+            let minSpacing = 0.1; // Minimum 1mm spacing
+            
+            for (let labels = 2; labels <= 20; labels++) {
+              const totalLabelHeight = labels * labelHeight;
+              const requiredSpacing = (labels - 1) * minSpacing;
+              const totalHeight = totalLabelHeight + requiredSpacing;
+              
+              if (totalHeight <= usableHeightCm) {
+                maxLabels = labels;
+              } else {
+                break;
+              }
+            }
+            
+            return maxLabels;
+          };
+          
+          const maxLabelsPerRow = calculateMaxLabelsPerRow(labelDimensions.width);
+          const maxLabelsPerCol = calculateMaxLabelsPerCol(labelDimensions.height);
+          const maxPerPage = maxLabelsPerRow * maxLabelsPerCol;
+          
+          // Calculate dynamic spacing
+          const horizontalSpacing = maxLabelsPerRow > 1 ? 
+            (usableWidthCm - (maxLabelsPerRow * labelDimensions.width)) / (maxLabelsPerRow - 1) : 0;
+          const verticalSpacing = maxLabelsPerCol > 1 ? 
+            (usableHeightCm - (maxLabelsPerCol * labelDimensions.height)) / (maxLabelsPerCol - 1) : 0;
 
+          // Calculate total pages needed
           const totalPages = Math.ceil(count / maxPerPage);
+
+          // Generate only non-empty pages
+          const pages = [];
+          for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+            const startIndex = pageIndex * maxPerPage;
+            const endIndex = Math.min(startIndex + maxPerPage, count);
+            const labelsOnThisPage = endIndex - startIndex;
+            
+            // Only include pages with labels
+            if (labelsOnThisPage > 0) {
+              pages.push({
+                pageIndex,
+                startIndex,
+                endIndex,
+                labelsOnThisPage,
+                isLastPage: pageIndex === totalPages - 1
+              });
+            }
+          }
 
           return (
             <>
-              {Array.from({ length: totalPages }).map((_, pageIndex) => {
-                const start = pageIndex * maxPerPage;
-                const end = Math.min(start + maxPerPage, count);
-                const items = end - start;
+              {pages.map(({ pageIndex, startIndex, endIndex, labelsOnThisPage, isLastPage }) => {
+                
+                // Calculate actual grid dimensions for this page
+                const actualCols = Math.min(maxLabelsPerRow, labelsOnThisPage);
+                const actualRows = Math.ceil(labelsOnThisPage / actualCols);
+                
                 return (
-                  <div key={pageIndex} className={`print-page ${pageIndex < totalPages - 1 ? 'print-break' : ''}`}>
+                  <div key={pageIndex} className={`print-page ${!isLastPage ? 'print-break' : ''}`}>
                     <div
                       className="print-grid"
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: `repeat(${maxLabelsPerRow}, ${printLabelWidthCm}cm)`,
-                        gap: `${spacingCm}cm`,
+                        gridTemplateColumns: `repeat(${actualCols}, ${labelDimensions.width}cm)`,
+                        gridTemplateRows: `repeat(${actualRows}, ${labelDimensions.height}cm)`,
+                        gap: `${verticalSpacing}cm ${horizontalSpacing}cm`,
                         justifyContent: 'start',
                         alignContent: 'start',
                         padding: 0,
                         margin: 0,
-                        pageBreakInside: 'avoid'
+                        pageBreakInside: 'avoid',
+                        width: `${usableWidthCm}cm`,
+                        minHeight: `${usableHeightCm}cm`,
+                        height: 'auto'
                       }}
                     >
-                      {Array.from({ length: items }).map((__, i) => (
+                      {Array.from({ length: labelsOnThisPage }).map((__, i) => (
                         <div
-                          key={start + i}
+                          key={startIndex + i}
                           className="print-label"
                           style={{
-                            width: `${printLabelWidthCm}cm`,
-                            height: `${printLabelHeightCm}cm`,
+                            width: `${labelDimensions.width}cm`,
+                            height: `${labelDimensions.height}cm`,
                             pageBreakInside: 'avoid',
+                            breakInside: 'avoid',
                             overflow: 'hidden',
                             display: 'flex',
                             alignItems: 'center',
@@ -427,8 +665,10 @@ export default function PrintPage() {
                               logoColor={logoColor}
                               pattern={pattern}
                               patternColor={patternColor}
+                              textColor={textColor}
                               textPosition={textPosition}
                               textSize={textSize}
+                              labelDimensions={labelDimensions}
                               className="w-full h-full"
                               forceScale={0.6}
                             />
@@ -455,25 +695,48 @@ export default function PrintPage() {
           }
           .print-grid {
             display: grid !important;
-            grid-template-columns: repeat(3, 6cm) !important;
-            gap: 0.3cm !important;
             justify-content: start !important;
             align-content: start !important;
-            width: fit-content !important;
             margin: 0 !important;
             padding: 0 !important;
+            box-sizing: border-box !important;
+            width: 16.8cm !important;
+            min-height: 23.76cm !important;
+            height: auto !important;
+          }
+          .print-page {
+            width: 100% !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            overflow: visible !important;
+            page-break-inside: avoid !important;
           }
           .print-page.print-break {
-            break-after: page !important;
             page-break-after: always !important;
+            break-after: page !important;
+          }
+          /* Windows-specific fixes */
+          @media print {
+            .print-page {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .print-page.print-break {
+              page-break-after: always !important;
+              break-after: page !important;
+              -webkit-break-after: page !important;
+            }
           }
           .print-label {
-            width: 6cm !important;
-            height: 4cm !important;
+            width: ${labelDimensions.width}cm !important;
+            height: ${labelDimensions.height}cm !important;
             margin: 0 !important;
             padding: 0 !important;
             box-sizing: border-box !important;
             page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           .print-label img { 
             display: block !important; 
@@ -491,11 +754,11 @@ export default function PrintPage() {
           }
           .print-label [data-label-container] > div:first-child {
             background-color: white !important;
-            filter: blur(8px) !important;
-            opacity: 0.6 !important;
+            filter: drop-shadow(0 0 30px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 60px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 90px rgba(0, 0, 0, 0.2)) drop-shadow(0 0 120px rgba(0, 0, 0, 0.15)) !important;
+            opacity: 1 !important;
           }
           @page {
-            margin: 0.5cm;
+            margin: 2.97cm 2.1cm;
             size: A4;
           }
           * {
