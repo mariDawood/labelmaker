@@ -1,7 +1,5 @@
 "use client";
-import Image from "next/image";
-import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LabelPreview, { BackgroundPattern } from "@/components/LabelPreview";
 import { PrinterIcon } from "lucide-react";
@@ -82,32 +80,6 @@ export default function Home() {
     router.push(`/print?${params.toString()}`);
   };
 
-  const patternStyle = useMemo(() => {
-    switch (pattern) {
-      case "dots":
-        return {
-          backgroundImage:
-            "radial-gradient(currentColor 1.5px, transparent 1.5px)",
-          backgroundSize: "16px 16px",
-          color: patternColor,
-        } as React.CSSProperties;
-      case "grid":
-        return {
-          backgroundImage:
-            "linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)",
-          backgroundSize: "20px 20px",
-          color: patternColor,
-        } as React.CSSProperties;
-      case "diagonal":
-        return {
-          backgroundImage:
-            "repeating-linear-gradient(45deg, currentColor, currentColor 2px, transparent 2px, transparent 12px)",
-          color: patternColor,
-        } as React.CSSProperties;
-      default:
-        return {} as React.CSSProperties;
-    }
-  }, [pattern, patternColor]);
 
   return (
     <div className="min-h-screen p-6 sm:p-10">

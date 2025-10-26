@@ -22,7 +22,6 @@ const LabelPreview = forwardRef<HTMLDivElement, LabelPreviewProps>((props, ref) 
   const { text, logoColor, pattern, patternColor, textColor, className, forceScale } = props;
   const textPosition = props.textPosition || { x: 50, y: 50 };
   const textSize = props.textSize || { width: 200, height: 80, fontSize: 24 };
-  const labelDimensions = props.labelDimensions || { width: 6, height: 4 }; // Default 6x4 cm
   const { onTextPositionChange, onTextSizeChange } = props;
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -229,7 +228,6 @@ const LabelPreview = forwardRef<HTMLDivElement, LabelPreviewProps>((props, ref) 
     }
     
     if (isResizing && containerRef.current && onTextSizeChange) {
-      const rect = containerRef.current.getBoundingClientRect();
       const deltaX = (e.clientX - dragStart.x) / scaleFactor;
       const deltaY = (e.clientY - dragStart.y) / scaleFactor;
       

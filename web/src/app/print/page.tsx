@@ -98,7 +98,6 @@ export default function PrintPage() {
       setLabelPngDataUrl(dataUrl);
     } catch (e) {
       // Fallback: let print continue with live DOM if rasterization fails
-      // eslint-disable-next-line no-console
       console.error("Failed to rasterize label for printing", e);
     }
   };
@@ -132,41 +131,41 @@ export default function PrintPage() {
       const labelWidthCm = labelDimensions.width;
       const labelHeightCm = labelDimensions.height;
       
-      // Calculate maximum labels per row with dynamic spacing
-      const calculateMaxLabelsPerRow = (labelWidth: number) => {
-        if (labelWidth >= usableWidthCm) return 1;
-        let maxLabels = 1;
-        let minSpacing = 0.1;
-        for (let labels = 2; labels <= 10; labels++) {
-          const totalLabelWidth = labels * labelWidth;
-          const requiredSpacing = (labels - 1) * minSpacing;
-          const totalWidth = totalLabelWidth + requiredSpacing;
-          if (totalWidth <= usableWidthCm) {
-            maxLabels = labels;
-          } else {
-            break;
-          }
-        }
-        return maxLabels;
-      };
-      
-      // Calculate maximum labels per column with dynamic spacing
-      const calculateMaxLabelsPerCol = (labelHeight: number) => {
-        if (labelHeight >= usableHeightCm) return 1;
-        let maxLabels = 1;
-        let minSpacing = 0.1;
-        for (let labels = 2; labels <= 20; labels++) {
-          const totalLabelHeight = labels * labelHeight;
-          const requiredSpacing = (labels - 1) * minSpacing;
-          const totalHeight = totalLabelHeight + requiredSpacing;
-          if (totalHeight <= usableHeightCm) {
-            maxLabels = labels;
-          } else {
-            break;
-          }
-        }
-        return maxLabels;
-      };
+              // Calculate maximum labels per row with dynamic spacing
+              const calculateMaxLabelsPerRow = (labelWidth: number) => {
+                if (labelWidth >= usableWidthCm) return 1;
+                let maxLabels = 1;
+                const minSpacing = 0.1;
+                for (let labels = 2; labels <= 10; labels++) {
+                  const totalLabelWidth = labels * labelWidth;
+                  const requiredSpacing = (labels - 1) * minSpacing;
+                  const totalWidth = totalLabelWidth + requiredSpacing;
+                  if (totalWidth <= usableWidthCm) {
+                    maxLabels = labels;
+                  } else {
+                    break;
+                  }
+                }
+                return maxLabels;
+              };
+              
+              // Calculate maximum labels per column with dynamic spacing
+              const calculateMaxLabelsPerCol = (labelHeight: number) => {
+                if (labelHeight >= usableHeightCm) return 1;
+                let maxLabels = 1;
+                const minSpacing = 0.1;
+                for (let labels = 2; labels <= 20; labels++) {
+                  const totalLabelHeight = labels * labelHeight;
+                  const requiredSpacing = (labels - 1) * minSpacing;
+                  const totalHeight = totalLabelHeight + requiredSpacing;
+                  if (totalHeight <= usableHeightCm) {
+                    maxLabels = labels;
+                  } else {
+                    break;
+                  }
+                }
+                return maxLabels;
+              };
       
       const maxLabelsPerRow = calculateMaxLabelsPerRow(labelWidthCm);
       const maxLabelsPerCol = calculateMaxLabelsPerCol(labelHeightCm);
@@ -325,7 +324,7 @@ export default function PrintPage() {
               const calculateMaxLabelsPerRow = (labelWidth: number) => {
                 if (labelWidth >= usableWidthCm) return 1;
                 let maxLabels = 1;
-                let minSpacing = 0.1; // Minimum 1mm spacing
+                const minSpacing = 0.1; // Minimum 1mm spacing
                 for (let labels = 2; labels <= 10; labels++) {
                   const totalLabelWidth = labels * labelWidth;
                   const requiredSpacing = (labels - 1) * minSpacing;
@@ -343,7 +342,7 @@ export default function PrintPage() {
               const calculateMaxLabelsPerCol = (labelHeight: number) => {
                 if (labelHeight >= usableHeightCm) return 1;
                 let maxLabels = 1;
-                let minSpacing = 0.1; // Minimum 1mm spacing
+                const minSpacing = 0.1; // Minimum 1mm spacing
                 for (let labels = 2; labels <= 20; labels++) {
                   const totalLabelHeight = labels * labelHeight;
                   const requiredSpacing = (labels - 1) * minSpacing;
@@ -377,8 +376,6 @@ export default function PrintPage() {
               const verticalSpacing = maxLabelsPerCol > 1 ? 
                 (usableHeightCm - (maxLabelsPerCol * labelHeightCm)) / (maxLabelsPerCol - 1) : 0;
               
-              const labelWidthPercent = (labelWidthCm / usableWidthCm) * 100;
-              const labelHeightPercent = (labelHeightCm / usableHeightCm) * 100;
               const spacingWidthPercent = (horizontalSpacing / usableWidthCm) * 100;
               const spacingHeightPercent = (verticalSpacing / usableHeightCm) * 100;
               
@@ -535,7 +532,7 @@ export default function PrintPage() {
             
             // Try to fit as many labels as possible with minimum spacing
             let maxLabels = 1;
-            let minSpacing = 0.1; // Minimum 1mm spacing
+            const minSpacing = 0.1; // Minimum 1mm spacing
             
             for (let labels = 2; labels <= 50; labels++) {
               const totalLabelWidth = labels * labelWidth;
@@ -557,7 +554,7 @@ export default function PrintPage() {
             if (labelHeight >= usableHeightCm) return 1; // Single label if too tall
             
             let maxLabels = 1;
-            let minSpacing = 0.1; // Minimum 1mm spacing
+            const minSpacing = 0.1; // Minimum 1mm spacing
             
             for (let labels = 2; labels <= 20; labels++) {
               const totalLabelHeight = labels * labelHeight;
@@ -608,7 +605,7 @@ export default function PrintPage() {
 
           return (
             <>
-              {pages.map(({ pageIndex, startIndex, endIndex, labelsOnThisPage, isLastPage }) => {
+              {pages.map(({ pageIndex, startIndex, labelsOnThisPage, isLastPage }) => {
                 
                 // Calculate actual grid dimensions for this page
                 const actualCols = Math.min(maxLabelsPerRow, labelsOnThisPage);
